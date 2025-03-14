@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wallpaper Changer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <h2>Current Wallpaper</h2>
+    <img id="wallpaper" src="" alt="Wallpaper" width="500">
+    
+    <h3>Upload New Wallpaper</h3>
+    <input type="file" id="fileInput">
+    <button onclick="uploadWallpaper()">Upload</button>
+
+    <script>
+        async function fetchWallpaper() {
+    try {
+        const response = await fetch("http://localhost:3000/current-wallpaper");
+        const data = await response.json();
+        if (data.wallpaper) {
+            document.getElementById("wallpaper").src = `http://localhost:3000${data.wallpaper}`;
+        }
+    } catch (error) {
+        console.error("Error fetching wallpaper:", error);
+    }
+}
+
+        async function uploadWallpaper() {
+            const fileInput = document.getElementById("fileInput");
+            if (!fileInput.files.length) {
+                alert("Please select an image first!");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append("wallpaper", fileInput.files[0]);
+
+            try {
+                const response = await fetch("http://localhost:3000/upload", {
+                    method: "POST",
+                    body: formData,
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    fetchWallpaper(); // Refresh the image
+                } else {
+                    alert("Failed to change wallpaper.");
+                }
+            } catch (error) {
+                console.error("Upload error:", error);
+            }
+        }
+
+        // Load the current wallpaper on page load
+        fetchWallpaper();
+    </script>
+
+</body>
+</html>
