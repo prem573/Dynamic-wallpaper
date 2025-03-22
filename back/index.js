@@ -56,7 +56,18 @@ async function downloadImage(imageUrl) {
         return null;
     }
 }
-
+app.get("/current-wallpaper", async (req, res) => {
+    try {
+        const wallpaperPath = await wallpaper.getWallpaper();
+        console.log("Current wallpaper:", wallpaperPath);   
+        const fileName = path.basename(wallpaperPath);
+        const localFilePath = path.join(uploadDir, fileName);
+        res.json({ wallpaper: `http://localhost:${PORT}/uploads/${fileName}` });
+    } catch (error) {
+        console.error("Error getting wallpaper:", error);
+        res.status(500).json({ error: "Failed to get wallpaper" });
+    }
+});
 app.post("/set-wallpaper", async (req, res) => {
     try {
         const { filename } = req.body;
