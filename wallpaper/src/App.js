@@ -61,6 +61,7 @@ function App() {
         Swal.fire("Success", "Wallpaper set successfully!", "success");
       } else {
         Swal.fire("Error", "Failed to set wallpaper!", "error");
+        console.log(data);
       }
     } catch (error) {
       console.error("Error setting wallpaper:", error);

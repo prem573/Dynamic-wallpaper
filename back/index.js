@@ -1,14 +1,14 @@
 const express = require("express");
-const multer = require("multer");
 const path = require("path");
 const wallpaper = require("wallpaper");
 const fs = require("fs");
 const cors = require("cors");
 const axios = require("axios");
-const FormData = require("form-data");
+
 const app = express();
 const PORT = 5000;
 const uploadDir = path.join(__dirname, "uploads"); 
+
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
 }
@@ -17,67 +17,70 @@ app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-
-app.get("/current-wallpaper", async (req, res) => {
+async function deleteAllFiles(directory) {
     try {
-        const wallpaperPath = await wallpaper.get();
-        const fileName = path.basename(wallpaperPath);
-        const localFilePath = path.join(uploadDir, fileName);
-
-        if (!fs.existsSync(localFilePath)) {
-            fs.copyFileSync(wallpaperPath, localFilePath);
+        const files = await fs.promises.readdir(directory);
+        for (const file of files) {
+            const filePath = path.join(directory, file);
+            const stats = await fs.promises.stat(filePath);
+            if (stats.isFile()) {
+                await fs.promises.unlink(filePath);
+                console.log(`Deleted: ${filePath}`);
+            }
         }
-
-        res.json({ wallpaper: `http://localhost:${PORT}/uploads/${fileName}` });
     } catch (error) {
-        console.error("Error getting wallpaper:", error);
-        res.status(500).json({ error: "Failed to get wallpaper" });
+        console.error("Error deleting files:", error);
     }
-});
+}
 
-const upload = multer({ dest: "uploads/" }); 
+async function downloadImage(imageUrl) {
+    try {
+        await deleteAllFiles(uploadDir); 
 
-app.post("/upload", upload.single("image"), async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({ error: "No file uploaded" });
+        const fileName = "wallpaper.jpg"; 
+        const savePath = path.join(uploadDir, fileName);
+
+        const response = await axios({
+            url: imageUrl,
+            responseType: "stream",
+        });
+
+        const writer = fs.createWriteStream(savePath);
+        return new Promise((resolve, reject) => {
+            response.data.pipe(writer);
+            writer.on("finish", () => resolve(savePath)); 
+            writer.on("error", (error) => reject(error));
+        });
+    } catch (error) {
+        console.error("Error downloading image:", error);
+        return null;
     }
-    const formData = new FormData();
-    formData.append("image", fs.createReadStream(req.file.path), req.file.originalname);
-    const phpResponse = await axios.post("https://your-php-api.com/upload.php", formData, {
-      headers: formData.getHeaders(),
-    });
-    fs.unlinkSync(req.file.path);
-    res.json({ success: true, response: phpResponse.data });
-  } catch (error) {
-    console.error("Error forwarding image:", error);
-    res.status(500).json({ error: "Failed to upload image" });
-  }
-});
+}
 
 app.post("/set-wallpaper", async (req, res) => {
     try {
-        console.log("Received body:", req.body);
         const { filename } = req.body;
-
         if (!filename) {
             return res.status(400).json({ success: false, message: "Filename is required" });
         }
 
-        const filePath = path.join(uploadDir, filename);
-        if (!fs.existsSync(filePath)) {
-            return res.status(404).json({ success: false, message: "File not found" });
+        const imgUrl = `https://premchand.tech/wallpaper/uploads/${filename}`;
+        const filePath = await downloadImage(imgUrl);
+        if (!filePath) {
+            return res.status(500).json({ success: false, message: "Failed to download image" });
         }
 
-        // await wallpaper.set(filePath);
+        await wallpaper.setWallpaper(filePath);
+        console.log("Wallpaper changed successfully!");
 
-        res.json({ success: true, message: "Wallpaper changed!", file: `/uploads/${filename}` });
+        res.json({ success: true, message: "Wallpaper changed!", file: `/uploads/wallpaper.jpg` });
     } catch (error) {
         console.error("Set Wallpaper Error:", error);
         res.status(500).json({ success: false, message: "Failed to set wallpaper", error });
     }
 });
 
+// Serve uploaded images
 app.use("/uploads", express.static(uploadDir));
 
 app.listen(PORT, () => {
